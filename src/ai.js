@@ -60,12 +60,20 @@ ${text}`;
 export async function generateDiary(historyByDay) {
   try {
     const model = getAI();
-    const days = Object.entries(historyByDay).slice(0, 5);
+    const today = new Date().toISOString().split('T')[0];
+    // Only use days up to today, never future
+    const days = Object.entries(historyByDay)
+      .filter(([date]) => date <= today)
+      .slice(0, 5);
     const text = days.map(([date, items]) =>
       `${date}:\n${items.slice(0, 10).map(i => i.title || i.url).join('\n')}`
     ).join('\n\n');
 
-    const prompt = `Create a personal diary from this browsing history. Write 2-3 sentences per day. Return ONLY valid JSON, no markdown:
+    const availableDates = days.map(([d]) => d).join(', ');
+
+    const prompt = `Create a personal diary from this browsing history. Write 2-3 sentences per day. 
+IMPORTANT: Only use dates from this list: ${availableDates}. Do NOT add entries for any other dates. Today is ${today} — do NOT generate entries for dates after today.
+Return ONLY valid JSON, no markdown:
 {"entries":[{"date":"YYYY-MM-DD","content":"..."}]}
 
 History:
@@ -74,7 +82,14 @@ ${text}`;
     const result = await withTimeout(model.generateContent(prompt), 15000);
     const raw = result.response.text();
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
-    return jsonMatch ? JSON.parse(jsonMatch[0]) : { entries: [] };
+    if (!jsonMatch) return { entries: [] };
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    // Extra safety: filter out any entries with future dates
+    if (parsed.entries) {
+      parsed.entries = parsed.entries.filter(e => !e.date || e.date <= today);
+    }
+    return parsed;
   } catch (e) {
     console.error('Diary Generation Failed:', e.message);
     if (e.message.includes('429') || e.message.includes('Quota')) {
