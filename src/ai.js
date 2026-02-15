@@ -1,3 +1,4 @@
+
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
 let genAI = null;
@@ -38,20 +39,31 @@ History:\n${text}`;
     return jsonMatch ? JSON.parse(jsonMatch[0]) : { interests: [], suggestions: [], diary_summary: 'AI returned invalid format' };
   } catch (e) {
     console.error('AI Analysis Failed:', e);
+    if (e.message.includes('429') || e.message.includes('Quota')) {
+      throw new Error('AI Quota Exceeded. Please try again in a minute.');
+    }
     throw new Error(`AI Error: ${e.message}`);
   }
 }
 
 export async function generateDiary(historyByDay) {
-  const model = getAI();
-  const days = Object.entries(historyByDay).slice(0, 7);
-  const text = days.map(([date, items]) => `${date}:\n${items.map(i => i.title || i.url).join('\n')}`).join('\n\n');
-  const prompt = `Create a personal diary from this browsing/search history. Write 2-4 sentences per day, reflective and narrative. Return JSON:
+  try {
+    const model = getAI();
+    const days = Object.entries(historyByDay).slice(0, 7);
+    const text = days.map(([date, items]) => `${date}:\n${items.map(i => i.title || i.url).join('\n')}`).join('\n\n');
+    const prompt = `Create a personal diary from this browsing/search history. Write 2-4 sentences per day, reflective and narrative. Return JSON:
 { "entries": [ { "date": "YYYY-MM-DD", "content": "..." } ] }
 
 History:\n${text}`;
-  const result = await model.generateContent(prompt);
-  const raw = result.response.text();
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  return jsonMatch ? JSON.parse(jsonMatch[0]) : { entries: [] };
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text();
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    return jsonMatch ? JSON.parse(jsonMatch[0]) : { entries: [] };
+  } catch (e) {
+    console.error('Diary Generation Failed:', e);
+    if (e.message.includes('429') || e.message.includes('Quota')) {
+      throw new Error('AI Quota Exceeded. Please try again later.');
+    }
+    return { entries: [] };
+  }
 }
