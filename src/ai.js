@@ -71,7 +71,7 @@ export async function generateDiary(historyByDay) {
 
     const availableDates = days.map(([d]) => d).join(', ');
 
-    const prompt = `Create a personal diary from this browsing history. Write 2-3 sentences per day. 
+    const prompt = `Create a personal diary from this browsing history. Write a detailed 4-6 sentence paragraph per day, reflecting on thoughts, feelings, and what was explored. Be narrative and introspective. 
 IMPORTANT: Only use dates from this list: ${availableDates}. Do NOT add entries for any other dates. Today is ${today} — do NOT generate entries for dates after today.
 Return ONLY valid JSON, no markdown:
 {"entries":[{"date":"YYYY-MM-DD","content":"..."}]}
