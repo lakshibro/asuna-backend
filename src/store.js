@@ -62,6 +62,31 @@ export function setDiary(userId, diary) {
   saveStore();
 }
 
+// Update specific diary entry by index or date
+export function updateDiaryEntry(userId, id, newContent) {
+  const diary = getDiary(userId);
+  const index = parseInt(id);
+  if (index >= 0 && index < diary.entries.length) {
+    diary.entries[index].content = newContent;
+    diary.entries[index].updatedAt = Date.now();
+    setDiary(userId, diary);
+    return diary.entries[index];
+  }
+  return null;
+}
+
+// Delete diary entry
+export function deleteDiaryEntry(userId, id) {
+  const diary = getDiary(userId);
+  const index = parseInt(id);
+  if (index >= 0 && index < diary.entries.length) {
+    diary.entries.splice(index, 1);
+    setDiary(userId, diary);
+    return true;
+  }
+  return false;
+}
+
 export function getInterests(userId) {
   return store.get(`interests:${userId}`) || { interests: [], suggestions: [] };
 }
@@ -69,4 +94,24 @@ export function getInterests(userId) {
 export function setInterests(userId, data) {
   store.set(`interests:${userId}`, data);
   saveStore();
+}
+
+// Analysis history (one per day)
+export function getInterestsHistory(userId) {
+  return store.get(`interests_history:${userId}`) || [];
+}
+
+export function addInterestsHistory(userId, analysis) {
+  const history = getInterestsHistory(userId);
+  const date = analysis.date || new Date().toISOString().split('T')[0];
+
+  // Remove existing entry for same day (keep one per day)
+  const filtered = history.filter(h => h.date !== date);
+  filtered.unshift(analysis);
+
+  // Keep last 30 days
+  const trimmed = filtered.slice(0, 30);
+  store.set(`interests_history:${userId}`, trimmed);
+  saveStore();
+  return trimmed;
 }

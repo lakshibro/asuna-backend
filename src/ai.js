@@ -83,3 +83,23 @@ ${text}`;
     return { entries: [] };
   }
 }
+
+// Rewrite diary entry with custom prompt
+export async function rewriteDiaryEntry(content, customPrompt) {
+  try {
+    const model = getAI();
+    const prompt = `${customPrompt}
+
+Original entry:
+${content}
+
+Return ONLY the rewritten entry text, no JSON, no markdown:`;
+
+    const result = await withTimeout(model.generateContent(prompt), 10000);
+    const raw = result.response.text();
+    return raw.trim();
+  } catch (e) {
+    console.error('Diary Rewrite Failed:', e.message);
+    throw new Error(`Rewrite failed: ${e.message}`);
+  }
+}
