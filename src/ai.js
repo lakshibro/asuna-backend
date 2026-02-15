@@ -12,19 +12,34 @@ function getAI() {
 }
 
 export async function analyzeSearchHistory(history) {
-  const model = getAI();
-  const text = history.slice(0, 50).map(h => `${h.url || ''} ${h.title || ''}`).join('\n');
-  const prompt = `Analyze this user's Chrome/search history (first 50 entries). Return JSON only:
+  try {
+    const model = getAI();
+    if (!history || history.length === 0) {
+      console.log('Analysis skipped: No history data');
+      return { interests: [], suggestions: ['Sync some history first!'], diary_summary: '' };
+    }
+
+    const text = history.slice(0, 50).map(h => `${h.url || ''} ${h.title || ''}`).join('\n');
+    console.log(`Analyzing ${history.length} items...`);
+
+    const prompt = `Analyze this user's Chrome/search history (first 50 entries). Return JSON only:
 {
   "interests": ["topic1", "topic2", "topic3"],
   "suggestions": ["try X", "explore Y"],
   "diary_summary": "2-3 sentence reflection on their online activity today"
 }
 History:\n${text}`;
-  const result = await model.generateContent(prompt);
-  const raw = result.response.text();
-  const jsonMatch = raw.match(/\{[\s\S]*\}/);
-  return jsonMatch ? JSON.parse(jsonMatch[0]) : { interests: [], suggestions: [], diary_summary: '' };
+
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text();
+    console.log('AI Response:', raw.substring(0, 100) + '...');
+
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    return jsonMatch ? JSON.parse(jsonMatch[0]) : { interests: [], suggestions: [], diary_summary: 'AI returned invalid format' };
+  } catch (e) {
+    console.error('AI Analysis Failed:', e);
+    throw new Error(`AI Error: ${e.message}`);
+  }
 }
 
 export async function generateDiary(historyByDay) {
