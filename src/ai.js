@@ -9,7 +9,7 @@ function getAI() {
     if (!key) throw new Error('GEMINI_API_KEY not set');
     genAI = new GoogleGenerativeAI(key);
   }
-  return genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-flash-lite-latest' });
+  return genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite' });
 }
 
 // Wrap a promise with a timeout
