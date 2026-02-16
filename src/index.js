@@ -5,7 +5,6 @@ import { diaryRoutes } from './routes/diary.js';
 import { interestsRoutes } from './routes/interests.js';
 import { contentRoutes } from './routes/content.js';
 import { historyRoutes } from './routes/history.js';
-import { imageRoutes } from './routes/images.js';
 import { store } from './store.js';
 
 dotenv.config();
@@ -39,7 +38,6 @@ app.use('/api', diaryRoutes);
 app.use('/api', interestsRoutes);
 app.use('/api', contentRoutes);
 app.use('/api', historyRoutes);
-app.use('/api/images', imageRoutes);
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`Asuna Backend running on http://0.0.0.0:${port}`);
