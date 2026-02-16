@@ -57,44 +57,85 @@ ${text}`;
   }
 }
 
-export async function generateDiary(historyByDay) {
+export async function generateDiary(historyByDay, context = {}) {
   try {
     const model = getAI();
     const today = new Date().toISOString().split('T')[0];
-    // Only use days up to today, never future
-    const days = Object.entries(historyByDay)
-      .filter(([date]) => date <= today)
-      .slice(0, 5);
-    const text = days.map(([date, items]) =>
-      `${date}:\n${items.slice(0, 10).map(i => i.title || i.url).join('\n')}`
-    ).join('\n\n');
 
-    const availableDates = days.map(([d]) => d).join(', ');
+    let daysToProcess = [];
 
-    const prompt = `Create a personal diary from this browsing history. Write a detailed 4-6 sentence paragraph per day, reflecting on thoughts, feelings, and what was explored. Be narrative and introspective. 
-IMPORTANT: Only use dates from this list: ${availableDates}. Do NOT add entries for any other dates. Today is ${today} — do NOT generate entries for dates after today.
-Return ONLY valid JSON, no markdown:
-{"entries":[{"date":"YYYY-MM-DD","content":"..."}]}
+    // Logic: Only generate for the target date (context.date) OR Today.
+    // We do NOT automatically regenerate past days anymore unless explicitly asked.
+    const targetDate = context.date || today;
 
-History:
-${text}`;
+    if (historyByDay[targetDate]) {
+      daysToProcess = [[targetDate, historyByDay[targetDate]]];
+    } else {
+      // If no history for today/target, maybe fallback to checking if there's *any* recent un-generated data?
+      // For now, based on user request "only generate todays entry", we stick to targetDate.
+      console.log(`No history found for ${targetDate}, skipping generation.`);
+      return { entries: [] };
+    }
 
-    const result = await withTimeout(model.generateContent(prompt), 15000);
+    const text = daysToProcess.map(([date, items]) => {
+      // Use ALL items (or a very large limit like 500)
+      // formatting: [HH:MM] Title (URL)
+      const dayItems = items.slice(0, 500).map(i => {
+        const time = i.lastVisitTime ? new Date(i.lastVisitTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+        return `[${time}] ${i.title || 'Unknown Page'} (${i.url})`;
+      }).join('\n');
+      return `Date: ${date}\nActivity Log:\n${dayItems}`;
+    }).join('\n\n');
+
+    const availableDates = daysToProcess.map(([d]) => d).join(', ');
+
+    let systemPrompt = `You are writing a deeply personal, detailed, and immersive diary entry for the user.
+    
+    INPUT DATA:
+    You are provided with a chronological log of the user's browser history for a specific day ("Activity Log").
+    The log includes timestamps ([HH:MM]). Use these to understand the flow of the day, gaps in activity, and late-night vs morning habits.
+    
+    INSTRUCTIONS:
+    1. Write a SINGLE, VERY LONG, and comprehensive diary entry for the date: ${availableDates}.
+    2. The entry must be at least 400-600 words long. Do not make it short.
+    3. Style: Introspective, emotional, narrative, and "stream of consciousness". It should feel like a real person documenting their life, not a summary of searches.
+    4. Connect the dots: If the user searched for "coding tutorials" then "youtube music", maybe they were studying with music. If they searched "late night delivery" at 2AM, comment on the late night.
+    5. Be judgmental, funny, or deep based on the content.
+    
+    IMPORTANT CONSTRAINTS:
+    - Only generate an entry for ${availableDates}.
+    - Do NOT mention "I saw in the logs". Pretend YOU are the user living this day.
+    - Return ONLY valid JSON.
+    `;
+
+    // Inject User Context
+    if (context.mood || context.activity) {
+      systemPrompt += `\n\nUSER CONTEXT (The user explicitly checked in with this):
+      - Mood: ${context.mood}
+      - Daily Highlights: ${context.activity}
+      
+      Integrate this deeply. If they felt "${context.mood}", the entire entry's tone should reflect that.`;
+    }
+
+    const prompt = `${systemPrompt}
+    
+    ${text}
+    
+    Output Format (JSON ONLY):
+    {"entries":[{"date":"YYYY-MM-DD","content":"(Long markdown text here)"}]}`;
+
+    // Extended timeout and token limit for larger generation
+    const result = await model.generateContent(prompt);
     const raw = result.response.text();
+
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return { entries: [] };
 
     const parsed = JSON.parse(jsonMatch[0]);
-    // Extra safety: filter out any entries with future dates
-    if (parsed.entries) {
-      parsed.entries = parsed.entries.filter(e => !e.date || e.date <= today);
-    }
     return parsed;
   } catch (e) {
     console.error('Diary Generation Failed:', e.message);
-    if (e.message.includes('429') || e.message.includes('Quota')) {
-      throw new Error('AI Quota Exceeded. Please try again later.');
-    }
+    if (e.message.includes('429')) return { entries: [] }; // Quota
     return { entries: [] };
   }
 }
