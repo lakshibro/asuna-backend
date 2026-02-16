@@ -62,6 +62,33 @@ export function setDiary(userId, diary) {
   saveStore();
 }
 
+export function addDiaryEntries(userId, newEntries) {
+  const current = getDiary(userId);
+  const existingEntries = current.entries || [];
+
+  // Create a map of existing entries by date for easy lookup/update
+  const entryMap = new Map(existingEntries.map(e => [e.date, e]));
+
+  // Merge new entries
+  newEntries.forEach(entry => {
+    // If entry for date exists, we might want to append or replace. 
+    // For now, let's append content if it exists, or just replace/add.
+    // The requirement is to "make a long detailed diary entry". 
+    // If we are regenerating for a day, we probably want to *replace* that day's entry or *append* to it.
+    // Let's go with replacement/update strategy: if it exists, replace it with the new generation (which should be comprehensive).
+    // Or, if the user manually edited it, maybe we shouldn't overwrite?
+    // User said "it regenerates all the previous entries aswell fix it".
+    // So we should ONLY touch the dates we are generating for.
+    entryMap.set(entry.date, entry);
+  });
+
+  const mergedEntries = Array.from(entryMap.values()).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  const newDiary = { ...current, entries: mergedEntries };
+  setDiary(userId, newDiary);
+  return newDiary;
+}
+
 // Update specific diary entry by index or date
 export function updateDiaryEntry(userId, id, newContent) {
   const diary = getDiary(userId);

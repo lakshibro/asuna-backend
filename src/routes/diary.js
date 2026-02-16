@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getHistory, getDiary, setDiary, updateDiaryEntry, deleteDiaryEntry } from '../store.js';
+import { getHistory, getDiary, setDiary, addDiaryEntries, updateDiaryEntry, deleteDiaryEntry } from '../store.js';
 import { generateDiary, rewriteDiaryEntry } from '../ai.js';
 
 export const diaryRoutes = Router();
@@ -24,11 +24,23 @@ diaryRoutes.get('/diary', (req, res) => {
 diaryRoutes.post('/diary/generate', async (req, res) => {
   try {
     const userId = req.body.userId || 'default';
+    const { date, mood, activity } = req.body;
+
+    // Get history
     const history = getHistory(userId);
     const byDay = groupByDay(history);
-    const diary = await generateDiary(byDay);
-    setDiary(userId, diary);
-    res.json(diary);
+
+    // Generate diary with context
+    // If date is specific, we only send that day's history? 
+    // Or we let AI decide but give it the target date context.
+    const context = { date, mood, activity };
+
+    const diary = await generateDiary(byDay, context);
+
+    // Append/Merge instead of overwrite
+    const updatedDiary = addDiaryEntries(userId, diary.entries);
+
+    res.json(updatedDiary);
   } catch (e) {
     res.status(500).json({ error: e.message });
   }
