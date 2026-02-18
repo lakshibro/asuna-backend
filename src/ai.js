@@ -79,8 +79,14 @@ export async function generateDiary(historyByDay, context = {}) {
 
     const text = daysToProcess.map(([date, items]) => {
       // Use ALL items (or a very large limit like 500)
+      console.log(`Generating diary for ${date}. Items: ${items.length}`);
+      if (items.length > 0) {
+        console.log(`Time range: ${new Date(items[items.length - 1].lastVisitTime).toLocaleTimeString()} -> ${new Date(items[0].lastVisitTime).toLocaleTimeString()}`);
+      }
+
       // formatting: [HH:MM] Title (URL)
-      const dayItems = items.slice(0, 500).map(i => {
+      // formatting: [HH:MM] Title (URL)
+      const dayItems = items.slice(0, 500).reverse().map(i => {
         const time = i.lastVisitTime ? new Date(i.lastVisitTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
         return `[${time}] ${i.title || 'Unknown Page'} (${i.url})`;
       }).join('\n');
