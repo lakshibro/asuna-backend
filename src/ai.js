@@ -17,7 +17,7 @@ function getAI() {
 }
 
 function getEmbeddingModel() {
-  return initGenAI().getGenerativeModel({ model: 'text-embedding-004' });
+  return initGenAI().getGenerativeModel({ model: 'gemini-embedding-001' });
 }
 
 // Wrap a promise with a timeout
@@ -218,17 +218,23 @@ export async function extractAndEmbedMemories(history, dateStr) {
 Extract the top 5-10 most significant "memories" or entities (technologies, places, people, deep research rabbit holes, recurring problems). 
 Format each as a full descriptive sentence.
 Ex: "Researched Three.js for 3D web animations."
-Return ONLY a valid JSON array of strings: ["memory 1", "memory 2"]
+Return ONLY a valid JSON array of strings: ["memory 1", "memory 2"]. If there is not much history, it is okay to just return 1 or 2 strings.
 
 History:
 ${text}`;
 
     const result = await withTimeout(model.generateContent(prompt), 30000);
     const raw = result.response.text();
+    console.log(`[DEBUG] Second Brain AI Raw Response:`, raw);
+    
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return 0;
+    if (!jsonMatch) {
+       console.log('[DEBUG] No JSON match found in response.');
+       return 0;
+    }
     
     const memories = JSON.parse(jsonMatch[0]);
+    console.log(`[DEBUG] Parsed ${memories.length} memories:`, memories);
     let added = 0;
 
     // Embed and store each memory
