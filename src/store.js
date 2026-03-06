@@ -142,3 +142,18 @@ export function addInterestsHistory(userId, analysis) {
   saveStore();
   return trimmed;
 }
+
+export function getMagazines(userId) {
+  return store.get(`magazines:${userId}`) || [];
+}
+
+export function addMagazine(userId, magazine) {
+  const mags = getMagazines(userId);
+  // Keep the latest 52 magazines (about a year)
+  const filtered = mags.filter(m => m.weekStartDate !== magazine.weekStartDate);
+  filtered.unshift(magazine);
+  const trimmed = filtered.slice(0, 52);
+  store.set(`magazines:${userId}`, trimmed);
+  saveStore();
+  return trimmed;
+}

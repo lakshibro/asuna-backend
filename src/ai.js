@@ -196,3 +196,48 @@ export async function answerFromHistory(history, query) {
     throw new Error(`Failed to query history: ${e.message}`);
   }
 }
+
+export async function generateSundayMagazine(history) {
+  try {
+    const model = getAI();
+    if (!history || history.length === 0) {
+      return null;
+    }
+
+    // Grab up to 800 items to represent the week
+    const items = history.slice(0, 800);
+    const text = items.map(h => {
+        const timeStr = h.lastVisitTime ? new Date(h.lastVisitTime).toLocaleString() : '';
+        return `[${timeStr}] ${h.title || 'Unknown Page'}`;
+    }).join('\n');
+
+    const systemPrompt = `Analyze this user's browsing history from the past week.
+    Generate a JSON object representing their "Sunday Magazine" weekly review.
+    
+    The JSON MUST have the following structure exactly (ONLY valid JSON, no markdown):
+    {
+      "weekSummary": "A catchy, 2-3 sentence overview of their week's vibe.",
+      "sentiment": "Overall emotional mood based on their searches (e.g., Stressed, Inspired, Curious, Relaxed)",
+      "topInterests": [
+        {"topic": "Topic Name", "description": "Brief context why"}
+      ],
+      "rabbitHole": "The weirdest, deepest, most interesting obscure thing they spent time researching",
+      "vibePrompt": "A highly vivid, short prompt describing a surreal, aesthetic image that represents their week. (e.g., 'A cyberpunk neon ramen shop with a laptop open showing code, highly detailed, octane render')"
+    }
+    
+    History Data:
+    ${text}`;
+
+    // Use a longer timeout as it's a lot of data
+    const result = await withTimeout(model.generateContent(systemPrompt), 30000);
+    const raw = result.response.text();
+    
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('Invalid JSON from AI');
+    
+    return JSON.parse(jsonMatch[0]);
+  } catch (e) {
+    console.error('Sunday Magazine Generation Failed:', e.message);
+    throw new Error(`Failed to generate magazine: ${e.message}`);
+  }
+}
