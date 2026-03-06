@@ -37,6 +37,22 @@ export function setupCronJobs() {
       console.error('[CRON] Failed to generate Sunday Magazine:', e.message);
     }
   });
+
+  // Run every night at 11:59 PM to consolidate the day's memories
+  cron.schedule('59 23 * * *', async () => {
+    console.log('[CRON] Starting Daily Second Brain Consolidation...');
+    try {
+      const history = getHistory('default');
+      const todayStr = new Date().toISOString().split('T')[0];
+      
+      // We process the top recent history elements
+      const { extractAndEmbedMemories } = await import('./ai.js');
+      const added = await extractAndEmbedMemories(history, todayStr);
+      console.log(`[CRON] Consolidated ${added} new embedded memories for ${todayStr}.`);
+    } catch(e) {
+      console.error('[CRON] Failed to consolidate memories:', e.message);
+    }
+  });
   
   console.log('✅ Cron jobs initialized.');
 }

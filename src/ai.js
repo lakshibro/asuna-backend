@@ -1,15 +1,23 @@
-
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { addMemory, searchMemories, getVectorCount } from './vectorStore.js';
 
 let genAI = null;
 
-function getAI() {
+function initGenAI() {
   if (!genAI) {
     const key = process.env.GEMINI_API_KEY;
     if (!key) throw new Error('GEMINI_API_KEY not set');
     genAI = new GoogleGenerativeAI(key);
   }
-  return genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite' });
+  return genAI;
+}
+
+function getAI() {
+  return initGenAI().getGenerativeModel({ model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite' });
+}
+
+function getEmbeddingModel() {
+  return initGenAI().getGenerativeModel({ model: 'text-embedding-004' });
 }
 
 // Wrap a promise with a timeout
@@ -197,6 +205,83 @@ export async function answerFromHistory(history, query) {
   }
 }
 
+export async function extractAndEmbedMemories(history, dateStr) {
+  try {
+    const model = getAI();
+    if (!history || history.length === 0) return 0;
+
+    // We'll process up to 300 recent items
+    const items = history.slice(0, 300);
+    const text = items.map(h => `${h.title || 'Unknown Page'} (${h.url})`).join('\n');
+
+    const prompt = `Analyze this browsing history from ${dateStr}. 
+Extract the top 5-10 most significant "memories" or entities (technologies, places, people, deep research rabbit holes, recurring problems). 
+Format each as a full descriptive sentence.
+Ex: "Researched Three.js for 3D web animations."
+Return ONLY a valid JSON array of strings: ["memory 1", "memory 2"]
+
+History:
+${text}`;
+
+    const result = await withTimeout(model.generateContent(prompt), 30000);
+    const raw = result.response.text();
+    const jsonMatch = raw.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return 0;
+    
+    const memories = JSON.parse(jsonMatch[0]);
+    let added = 0;
+
+    // Embed and store each memory
+    for (const mem of memories) {
+      try {
+        const embedding = await createEmbedding(mem);
+        addMemory(mem, embedding, { date: dateStr, source: 'history' });
+        added++;
+      } catch (e) {
+         console.error('Failed to embed a memory chunk:', e.message);
+      }
+    }
+    return added;
+  } catch (e) {
+    console.error('Extraction Failed:', e.message);
+    throw e;
+  }
+}
+
+export async function answerFromSecondBrain(query) {
+  try {
+    const model = getAI();
+    
+    // 1. Embed the query
+    const queryVector = await createEmbedding(query);
+    
+    // 2. Search local memory graph (top 7 closely related concepts)
+    const matches = searchMemories(queryVector, 7);
+    
+    if (matches.length === 0) {
+      return "My Second Brain is empty right now. I don't have any deep memories to search through yet.";
+    }
+
+    // 3. Construct context
+    let contextStr = matches.map(m => `[Confidence: ${(m.score*100).toFixed(1)}%, Date: ${m.metadata.date || 'Unknown'}] ${m.text}`).join('\n');
+
+    const systemPrompt = `You are Asuna, accessing the user's highly personal "Second Brain" knowledge graph.
+    The user is asking: "${query}"
+    
+    Here are the most relevant retrieved memories from their past web history and thoughts:
+    ${contextStr}
+    
+    Answer the user's question accurately, natively, and naturally based ONLY on these memories. 
+    Act like you possess a perfect long-term memory. Be helpful, and you can point out connections if relevant.`;
+
+    const result = await model.generateContent(systemPrompt);
+    return result.response.text().trim();
+  } catch (e) {
+    console.error('Second Brain Recall Failed:', e.message);
+    throw new Error(`Second brain offline: ${e.message}`);
+  }
+}
+
 export async function generateSundayMagazine(history) {
   try {
     const model = getAI();
@@ -239,5 +324,16 @@ export async function generateSundayMagazine(history) {
   } catch (e) {
     console.error('Sunday Magazine Generation Failed:', e.message);
     throw new Error(`Failed to generate magazine: ${e.message}`);
+  }
+}
+
+export async function createEmbedding(text) {
+  try {
+    const model = getEmbeddingModel();
+    const result = await model.embedContent(text);
+    return result.embedding.values;
+  } catch (e) {
+    console.error('Embedding Generation Failed:', e.message);
+    throw new Error(`Failed to create embedding: ${e.message}`);
   }
 }

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { addHistory, getHistory } from '../store.js';
-import { answerFromHistory } from '../ai.js';
+import { answerFromHistory, extractAndEmbedMemories, answerFromSecondBrain } from '../ai.js';
+import { getVectorCount } from '../vectorStore.js';
 
 export const historyRoutes = Router();
 
@@ -56,11 +57,44 @@ historyRoutes.post('/history/query', async (req, res) => {
     const { userId = 'default', query } = req.body;
     if (!query) return res.status(400).json({ error: 'Query is required' });
 
-    const history = getHistory(userId);
-    const answer = await answerFromHistory(history, query);
+    // Use Second Brain if we have memories, otherwise fallback to recent history
+    const vectorCount = getVectorCount();
+    let answer;
+    
+    if (vectorCount > 0) {
+       console.log(`[Second Brain] Searching ${vectorCount} embedded memories...`);
+       answer = await answerFromSecondBrain(query);
+    } else {
+       console.log(`[Second Brain] Empty. Falling back to recent history search...`);
+       const history = getHistory(userId);
+       answer = await answerFromHistory(history, query);
+    }
 
-    res.json({ answer });
+    res.json({ answer, source: vectorCount > 0 ? 'second_brain' : 'recent_history' });
   } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// Consolidate Memory: Triggers the embedding feature
+historyRoutes.post('/history/consolidate', async (req, res) => {
+  try {
+    const userId = req.body.userId || 'default';
+    const history = getHistory(userId);
+    
+    if (!history || history.length === 0) {
+      return res.status(400).json({ error: 'No history to consolidate' });
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    console.log(`[Second Brain] Consolidating memories for ${todayStr}...`);
+    
+    // We only embed the top X latest things since we don't have delta-tracking yet
+    // In production, we'd flag items that have already been embedded.
+    const addedCount = await extractAndEmbedMemories(history, todayStr);
+    
+    res.json({ success: true, added: addedCount, totalMemories: getVectorCount() });
+  } catch(e) {
     res.status(500).json({ error: e.message });
   }
 });
