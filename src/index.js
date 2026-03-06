@@ -6,6 +6,7 @@ import { interestsRoutes } from './routes/interests.js';
 import { contentRoutes } from './routes/content.js';
 import { historyRoutes } from './routes/history.js';
 import { magazineRoutes } from './routes/magazine.js';
+import { recallRoutes } from './routes/recall.js';
 import { setupCronJobs } from './cron.js';
 import { store } from './store.js';
 
@@ -44,6 +45,7 @@ app.use('/api', interestsRoutes);
 app.use('/api', contentRoutes);
 app.use('/api', historyRoutes);
 app.use('/api', magazineRoutes);
+app.use('/api', recallRoutes);
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`Asuna Backend running on http://0.0.0.0:${port}`);
