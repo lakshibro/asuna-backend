@@ -7,7 +7,7 @@ export const diaryRoutes = Router();
 function groupByDay(history) {
   const byDay = {};
   for (const item of history) {
-    const ts = item.timestamp || Date.now();
+    const ts = item.lastVisitTime || item.timestamp || Date.now();
     const date = new Date(ts).toISOString().split('T')[0];
     if (!byDay[date]) byDay[date] = [];
     byDay[date].push(item);

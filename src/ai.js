@@ -95,22 +95,21 @@ export async function generateDiary(historyByDay, context = {}) {
 
     const availableDates = daysToProcess.map(([d]) => d).join(', ');
 
-    let systemPrompt = `You are writing a deeply personal, detailed, and immersive diary entry for the user.
+    let systemPrompt = `You are writing a personal and natural diary entry for the user based on their browsing history.
     
     INPUT DATA:
     You are provided with a chronological log of the user's browser history for a specific day ("Activity Log").
-    The log includes timestamps ([HH:MM]). Use these to understand the flow of the day, gaps in activity, and late-night vs morning habits.
+    The log includes timestamps ([HH:MM]). Use these to understand the flow of the day, gaps in activity, and habits.
     
     INSTRUCTIONS:
-    1. Write a SINGLE, VERY LONG, and comprehensive diary entry for the date: ${availableDates}.
-    2. The entry must be at least 400-600 words long. Do not make it short.
-    3. Style: Introspective, emotional, narrative, and "stream of consciousness". It should feel like a real person documenting their life, not a summary of searches.
-    4. Connect the dots: If the user searched for "coding tutorials" then "youtube music", maybe they were studying with music. If they searched "late night delivery" at 2AM, comment on the late night.
-    5. Be judgmental, funny, or deep based on the content.
+    1. Write a SINGLE, cohesive diary entry for the date: ${availableDates}.
+    2. Style: Natural, conversational, and introspective. Write like a real person documenting their day-to-day life. Avoid making it overly dramatic or robotic.
+    3. Connect the dots: If the user searched for "coding tutorials" then "youtube music", maybe they were studying with music.
+    4. You can be mildly judgmental or funny if it fits the searches (e.g., searching for the same basic programming question 5 times).
     
     IMPORTANT CONSTRAINTS:
     - Only generate an entry for ${availableDates}.
-    - Do NOT mention "I saw in the logs". Pretend YOU are the user living this day.
+    - Do NOT mention "I saw in the logs" or "Based on your search history". Pretend YOU are the user living this day.
     - Return ONLY valid JSON.
     `;
 
@@ -163,5 +162,37 @@ Return ONLY the rewritten entry text, no JSON, no markdown:`;
   } catch (e) {
     console.error('Diary Rewrite Failed:', e.message);
     throw new Error(`Rewrite failed: ${e.message}`);
+  }
+}
+
+export async function answerFromHistory(history, query) {
+  try {
+    const model = getAI();
+    if (!history || history.length === 0) {
+      return "I don't have any browsing history to search through yet. Make sure your Asuna Chrome Extension is connected!";
+    }
+
+    // Limit to 100 items for context size, using titles and URLs
+    const items = history.slice(0, 100);
+    const text = items.map(h => {
+        const timeStr = h.lastVisitTime ? new Date(h.lastVisitTime).toLocaleString() : '';
+        return `[${timeStr}] ${h.title || 'Unknown Page'} (${h.url})`;
+    }).join('\n');
+
+    const systemPrompt = `You are Asuna, an AI assistant analyzing the user's browser history to answer their question.
+    Keep your answer concise, helpful, and conversational. Do not list raw URLs unless they specifically ask for links.
+    
+    Browser History Snapshot (last 100 items):
+    ${text}
+    
+    User Query: ${query}
+    
+    Response format: Plain text response answering the user's question directly. Keep it short.`;
+
+    const result = await model.generateContent(systemPrompt);
+    return result.response.text().trim();
+  } catch (e) {
+    console.error('History Answer Failed:', e.message);
+    throw new Error(`Failed to query history: ${e.message}`);
   }
 }
