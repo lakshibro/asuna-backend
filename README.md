@@ -57,3 +57,23 @@ The Node.js/Express backend powering the Asuna ecosystem. It acts as the central
 ## Deployment
 
 Designed to be hosted alongside the `whatsapp-ai-bot` on a DigitalOcean Droplet using PM2. See the main `ASUNA_README.md` for ecosystem architecture and deployment strategies.
+
+### PM2 Debugging Commands
+
+When running on the server via PM2, use these commands to monitor and debug:
+```bash
+# View real-time logs (useful for debugging API calls and Cron jobs)
+pm2 logs asuna-backend
+
+# Restart the application
+pm2 restart asuna-backend
+
+# Stop the application
+pm2 stop asuna-backend
+
+# Open the PM2 dashboard to monitor CPU/Memory
+pm2 monit
+
+# List all running PM2 processes
+pm2 list
+```
