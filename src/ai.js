@@ -48,8 +48,15 @@ History:
 ${text}`;
 
     const result = await withTimeout(model.generateContent(prompt), 15000);
-    const raw = result.response.text();
+    let raw = result.response.text();
     console.log('AI Response:', raw.substring(0, 100) + '...');
+
+    // Attempt to strip markdown formatting if presence
+    if (raw.startsWith('```json')) {
+      raw = raw.replace(/^```json\n/, '').replace(/\n```$/, '');
+    } else if (raw.startsWith('```')) {
+      raw = raw.replace(/^```\n/, '').replace(/\n```$/, '');
+    }
 
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     return jsonMatch ? JSON.parse(jsonMatch[0]) : { interests: [], suggestions: [], diary_summary: 'AI returned invalid format' };
@@ -72,15 +79,18 @@ export async function generateDiary(historyByDay, context = {}) {
 
     let daysToProcess = [];
 
-    // Logic: Only generate for the target date (context.date) OR Today.
-    // We do NOT automatically regenerate past days anymore unless explicitly asked.
-    const targetDate = context.date || today;
+    // Logic: Only generate for the target date (context.date) OR the most recent day in history.
+    let targetDate = context.date;
+    const availableDates = Object.keys(historyByDay).sort((a,b) => new Date(b) - new Date(a));
+    
+    if (!targetDate) {
+        targetDate = availableDates.length > 0 ? availableDates[0] : today;
+    }
 
     if (historyByDay[targetDate]) {
       daysToProcess = [[targetDate, historyByDay[targetDate]]];
     } else {
-      // If no history for today/target, maybe fallback to checking if there's *any* recent un-generated data?
-      // For now, based on user request "only generate todays entry", we stick to targetDate.
+      // If no history for target, fallback
       console.log(`No history found for ${targetDate}, skipping generation.`);
       return { entries: [] };
     }
@@ -101,7 +111,7 @@ export async function generateDiary(historyByDay, context = {}) {
       return `Date: ${date}\nActivity Log:\n${dayItems}`;
     }).join('\n\n');
 
-    const availableDates = daysToProcess.map(([d]) => d).join(', ');
+    const availableDatesStr = daysToProcess.map(([d]) => d).join(', ');
 
     let systemPrompt = `You are writing a personal and natural diary entry for the user based on their browsing history.
     
@@ -110,13 +120,13 @@ export async function generateDiary(historyByDay, context = {}) {
     The log includes timestamps ([HH:MM]). Use these to understand the flow of the day, gaps in activity, and habits.
     
     INSTRUCTIONS:
-    1. Write a SINGLE, cohesive diary entry for the date: ${availableDates}.
+    1. Write a SINGLE, cohesive diary entry for the date: ${availableDatesStr}.
     2. Style: Natural, conversational, and introspective. Write like a real person documenting their day-to-day life. Avoid making it overly dramatic or robotic.
     3. Connect the dots: If the user searched for "coding tutorials" then "youtube music", maybe they were studying with music.
     4. You can be mildly judgmental or funny if it fits the searches (e.g., searching for the same basic programming question 5 times).
     
     IMPORTANT CONSTRAINTS:
-    - Only generate an entry for ${availableDates}.
+    - Only generate an entry for ${availableDatesStr}.
     - Do NOT mention "I saw in the logs" or "Based on your search history". Pretend YOU are the user living this day.
     - Return ONLY valid JSON.
     `;
@@ -139,7 +149,14 @@ export async function generateDiary(historyByDay, context = {}) {
 
     // Extended timeout and token limit for larger generation
     const result = await model.generateContent(prompt);
-    const raw = result.response.text();
+    let raw = result.response.text();
+
+    // Strip markdown formatting
+    if (raw.startsWith('```json')) {
+      raw = raw.replace(/^```json\n/, '').replace(/\n```$/, '');
+    } else if (raw.startsWith('```')) {
+      raw = raw.replace(/^```\n/, '').replace(/\n```$/, '');
+    }
 
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) return { entries: [] };
@@ -224,9 +241,16 @@ History:
 ${text}`;
 
     const result = await withTimeout(model.generateContent(prompt), 30000);
-    const raw = result.response.text();
+    let raw = result.response.text();
     console.log(`[DEBUG] Second Brain AI Raw Response:`, raw);
     
+    // Strip markdown formatting
+    if (raw.startsWith('```json')) {
+      raw = raw.replace(/^```json\n/, '').replace(/\n```$/, '');
+    } else if (raw.startsWith('```')) {
+      raw = raw.replace(/^```\n/, '').replace(/\n```$/, '');
+    }
+
     const jsonMatch = raw.match(/\[[\s\S]*\]/);
     if (!jsonMatch) {
        console.log('[DEBUG] No JSON match found in response.');
@@ -321,8 +345,15 @@ export async function generateSundayMagazine(history) {
 
     // Use a longer timeout as it's a lot of data
     const result = await withTimeout(model.generateContent(systemPrompt), 30000);
-    const raw = result.response.text();
+    let raw = result.response.text();
     
+    // Strip markdown formatting
+    if (raw.startsWith('```json')) {
+      raw = raw.replace(/^```json\n/, '').replace(/\n```$/, '');
+    } else if (raw.startsWith('```')) {
+      raw = raw.replace(/^```\n/, '').replace(/\n```$/, '');
+    }
+
     const jsonMatch = raw.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('Invalid JSON from AI');
     

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { searchMemories, getVectorCount } from '../vectorStore.js';
-import { createEmbedding } from '../ai.js';
+import { createEmbedding, extractAndEmbedMemories } from '../ai.js';
+import { getHistory } from '../store.js';
 
 export const recallRoutes = Router();
 
@@ -40,6 +41,22 @@ recallRoutes.post('/recall', async (req, res) => {
     res.json({ memories: relevant, count: vectorCount });
   } catch (e) {
     console.error('Recall endpoint error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /api/recall/extract
+ * Force extracts memories from the user's history immediately
+ */
+recallRoutes.post('/recall/extract', async (req, res) => {
+  try {
+    const userId = req.body.userId || 'default';
+    const history = getHistory(userId);
+    const todayStr = new Date().toISOString().split('T')[0];
+    const added = await extractAndEmbedMemories(history, todayStr);
+    res.json({ success: true, added });
+  } catch (e) {
     res.status(500).json({ error: e.message });
   }
 });
