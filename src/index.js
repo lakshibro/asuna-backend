@@ -1,6 +1,8 @@
+import dotenv from 'dotenv';
+dotenv.config(); // MUST run before any imports that read process.env
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import { diaryRoutes } from './routes/diary.js';
 import { interestsRoutes } from './routes/interests.js';
 import { contentRoutes } from './routes/content.js';
@@ -12,8 +14,6 @@ import { store } from './store.js';
 
 // Setup periodic tasks
 setupCronJobs();
-
-dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3848;

@@ -145,7 +145,7 @@ export async function generateDiary(historyByDay, context = {}) {
     ${text}
     
     Output Format (JSON ONLY):
-    {"entries":[{"date":"YYYY-MM-DD","content":"(Long markdown text here)"}]}`;
+    {"entries":[{"date":"${availableDatesStr}","content":"(Long markdown text here)"}]}`;
 
     // Extended timeout and token limit for larger generation
     const result = await model.generateContent(prompt);
@@ -162,6 +162,8 @@ export async function generateDiary(historyByDay, context = {}) {
     if (!jsonMatch) return { entries: [] };
 
     const parsed = JSON.parse(jsonMatch[0]);
+    // Safety check to only return the generated TARGET date
+    parsed.entries = parsed.entries.filter(e => e.date === availableDatesStr);
     return parsed;
   } catch (e) {
     console.error('Diary Generation Failed:', e.message);

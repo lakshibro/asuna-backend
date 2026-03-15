@@ -7,7 +7,7 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR);
 const STORE_FILE = path.join(DATA_DIR, 'store.json');
 
-export const store = new NodeCache({ stdTTL: 86400 * 7 }); // 7 days
+export const store = new NodeCache({ stdTTL: 0 }); // No auto-expiry — data is persisted to disk
 
 // Load from file on start
 try {
@@ -40,9 +40,11 @@ export function getHistory(userId) {
 
 export function addHistory(userId, items) {
   const existing = getHistory(userId);
-  const seen = new Set(existing.map(i => i.url + i.timestamp));
-  const newItems = items.filter(i => !seen.has((i.url || '') + (i.timestamp || '')));
-  const merged = [...existing, ...newItems].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 500);
+  const seen = new Set(existing.map(i => (i.url || '') + '_' + (i.lastVisitTime || i.timestamp || '')));
+  const newItems = items.filter(i => !seen.has((i.url || '') + '_' + (i.lastVisitTime || i.timestamp || '')));
+  const merged = [...existing, ...newItems]
+    .sort((a, b) => (b.lastVisitTime || b.timestamp || 0) - (a.lastVisitTime || a.timestamp || 0))
+    .slice(0, 2000);
   store.set(`history:${userId}`, merged);
   saveStore(); // Save immediately on sync
   return merged;

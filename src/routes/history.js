@@ -3,6 +3,8 @@ import { addHistory, getHistory } from '../store.js';
 import { answerFromHistory, extractAndEmbedMemories, answerFromSecondBrain } from '../ai.js';
 import { getVectorCount } from '../vectorStore.js';
 
+const BOT_URL = process.env.BOT_URL || 'http://127.0.0.1:3847';
+
 export const historyRoutes = Router();
 
 // Helper to detect heavy browsing sessions on a single topic
@@ -33,7 +35,7 @@ historyRoutes.post('/history/sync', async (req, res) => {
     console.log(`[Proactive] Trigger detected: ${trigger.type}`);
     try {
       // Assuming whatsapp-bot runs on 3847 locally
-      await fetch('http://localhost:3847/api/proactive', {
+      await fetch(`${BOT_URL}/api/proactive`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ userId, trigger })

@@ -2,6 +2,9 @@ import cron from 'node-cron';
 import { getHistory, addMagazine } from './store.js';
 import { generateSundayMagazine } from './ai.js';
 
+// Bot URL for proactive triggers (WhatsApp bot API)
+const BOT_URL = process.env.BOT_URL || 'http://127.0.0.1:3847';
+
 export function setupCronJobs() {
   // Run every Sunday at 08:00 AM
   cron.schedule('0 8 * * 0', async () => {
@@ -61,7 +64,7 @@ export function setupCronJobs() {
       const history = getHistory('default');
       if (history.length > 5) {
         const topics = history.slice(0, 5).map(h => h.title || h.url).join(', ');
-        await fetch('http://127.0.0.1:3847/api/proactive', {
+        await fetch(`${BOT_URL}/api/proactive`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ trigger: { type: 'Recent browsing activity', context: topics } })
